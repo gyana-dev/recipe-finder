@@ -1,43 +1,78 @@
-const searchForm = document.getElementById("search-form");
-const searchInput = document.getElementById("search-input");
-const recipesContainer = document.getElementById("recipes-container");
+const API_KEY = "e71e0f3bb0e34d749d17b39ca636d246";
+const form = document.getElementById("search-form");
+const input = document.getElementById("search-input");
+const resultsContainer = document.getElementById("results");
 
-const API_KEY = "your_api_key_here";  // Replace with your API key
-const API_URL = `https://api.spoonacular.com/recipes/complexSearch?apiKey=${API_KEY}&query=`;
+form.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const query = input.value.trim();
 
-searchForm.addEventListener("submit", (event) => {
-    event.preventDefault();
-    const query = searchInput.value.trim();
-    if (query) {
-        fetchRecipes(query);
-    }
+  if (query) {
+    resultsContainer.innerHTML = "<p>Loading...</p>";
+    const res = await fetch(`https://api.spoonacular.com/recipes/complexSearch?query=${query}&number=10&apiKey=${API_KEY}`);
+    const data = await res.json();
+    displayResults(data.results);
+  }
 });
 
-async function fetchRecipes(query) {
-    try {
-        const response = await fetch(API_URL + query);
-        const data = await response.json();
-        displayRecipes(data.results);
-    } catch (error) {
-        console.error("Error fetching recipes:", error);
-    }
+function displayResults(recipes) {
+  resultsContainer.innerHTML = "";
+  recipes.forEach((recipe) => {
+    const card = document.createElement("div");
+    card.classList.add("recipe-card");
+    card.innerHTML = `
+      <img src="${recipe.image}" alt="${recipe.title}" />
+      <h3>${recipe.title}</h3>
+      <button class="view-btn" data-id="${recipe.id}">View Recipe</button>
+    `;
+    resultsContainer.appendChild(card);
+  });
+
+  document.querySelectorAll(".view-btn").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      const id = btn.getAttribute("data-id");
+      const recipeDetails = await fetchRecipeDetails(id);
+      showModal(recipeDetails);
+    });
+  });
 }
 
-function displayRecipes(recipes) {
-    recipesContainer.innerHTML = "";
-    if (recipes.length === 0) {
-        recipesContainer.innerHTML = "<p>No recipes found.</p>";
-        return;
-    }
+async function fetchRecipeDetails(id) {
+  const res = await fetch(`https://api.spoonacular.com/recipes/${id}/information?apiKey=${API_KEY}`);
+  return await res.json();
+}
 
-    recipes.forEach((recipe) => {
-        const recipeCard = document.createElement("div");
-        recipeCard.classList.add("recipe-card");
-        recipeCard.innerHTML = `
-            <img src="${recipe.image}" alt="${recipe.title}">
-            <h3>${recipe.title}</h3>
-            <a href="https://spoonacular.com/recipes/${recipe.id}" target="_blank">View Recipe</a>
-        `;
-        recipesContainer.appendChild(recipeCard);
-    });
+function showModal(recipe) {
+  const modal = document.createElement("div");
+  modal.classList.add("modal");
+
+  modal.innerHTML = `
+    <div class="modal-content">
+      <span class="close-button">&times;</span>
+      <h2>${recipe.title}</h2>
+      <img src="${recipe.image}" alt="${recipe.title}" />
+      <p><strong>Ready in:</strong> ${recipe.readyInMinutes} minutes</p>
+      <p><strong>Servings:</strong> ${recipe.servings}</p>
+      <h3>Ingredients:</h3>
+      <ul>
+        ${recipe.extendedIngredients.map(ing => `<li>${ing.original}</li>`).join("")}
+      </ul>
+      <h3>Instructions:</h3>
+      <p>${recipe.instructions || "No instructions available."}</p>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  // Close modal
+  modal.querySelector(".close-button").addEventListener("click", () => {
+    modal.remove();
+  });
+
+  // Close when clicking outside modal content
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) {
+      modal.remove();
+    }
+  });
 }
